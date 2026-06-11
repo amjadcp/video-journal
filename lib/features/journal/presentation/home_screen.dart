@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/features/camera/presentation/camera_screen.dart';
 import 'package:video_journal/features/folders/presentation/folder_detail_screen.dart';
 import 'package:video_journal/features/folders/presentation/folders_controller.dart';
 import 'package:video_journal/features/journal/presentation/asset_detail_screen.dart';
 import 'package:video_journal/features/journal/presentation/journal_controller.dart';
 import 'package:video_journal/features/journal/presentation/search_screen.dart';
-import 'package:video_journal/features/settings/presentation/settings_screen.dart'; // We will create this next
+import 'package:video_journal/features/settings/presentation/settings_screen.dart';
 import 'package:video_journal/shared/enums/enums.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -50,6 +51,8 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final assetsState = ref.watch(journalControllerProvider);
     final foldersState = ref.watch(foldersControllerProvider);
+    final authState = ref.watch(authStateProvider);
+    final currentUser = authState.valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -73,46 +76,47 @@ class HomeScreen extends ConsumerWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          // Backup Status Indicator banner
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.cloud_queue, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Cloud Backup',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Connect Google Drive to back up memories.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ],
+          // Backup Status Indicator banner (only shown if not authenticated)
+          if (currentUser == null)
+            SliverToBoxAdapter(
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_queue, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cloud Backup',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          SizedBox(height: 2),
+                          Text(
+                            'Connect Google Drive to back up memories.',
+                            style: TextStyle(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      ),
+                      child: const Text('Connect'),
                     ),
-                    child: const Text('Connect'),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
 
           // Folders Header
           SliverToBoxAdapter(

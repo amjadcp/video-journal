@@ -116,6 +116,15 @@ class BackupManager {
 
   Future<void> _uploadDatabase(dynamic api, String parentId) async {
     try {
+      // Checkpoint the database to make sure WAL file is fully merged into journal.db
+      try {
+        final db = _ref.read(journalDatabaseProvider);
+        await db.customStatement('PRAGMA wal_checkpoint(TRUNCATE)');
+        AppLogger.info(LogCategory.backup, 'Database checkpoint completed successfully');
+      } catch (e, stack) {
+        AppLogger.error(LogCategory.backup, 'Failed to checkpoint database before backup', e, stack);
+      }
+
       final dbFolder = await getApplicationDocumentsDirectory();
       final dbFile = File(p.join(dbFolder.path, 'journal.db'));
 

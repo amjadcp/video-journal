@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:video_journal/core/storage/database.dart';
 import 'package:video_journal/features/auth/data/auth_repository_impl.dart';
 import 'package:video_journal/features/auth/domain/auth_repository.dart';
@@ -37,4 +38,9 @@ final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
 // Auth Repository Provider
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepositoryImpl();
+});
+
+// Auth State Provider
+final authStateProvider = StreamProvider<User?>((ref) {
+  return ref.watch(authRepositoryProvider).authStateChanges;
 });

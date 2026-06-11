@@ -8,6 +8,8 @@ import 'package:video_journal/features/backup/data/backup_worker.dart';
 import 'package:video_journal/features/backup/domain/backup_manager.dart';
 import 'package:video_journal/features/backup/domain/restore_manager.dart';
 import 'package:video_journal/features/sync/data/drive_service.dart';
+import 'package:video_journal/features/journal/presentation/journal_controller.dart';
+import 'package:video_journal/features/folders/presentation/folders_controller.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -191,6 +193,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           });
         },
       );
+      // Reload UI controllers with the newly restored local database data
+      await ref.read(journalControllerProvider.notifier).loadAssets();
+      await ref.read(foldersControllerProvider.notifier).loadFolders();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Restored successfully.')),
