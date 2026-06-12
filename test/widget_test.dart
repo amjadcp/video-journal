@@ -12,7 +12,7 @@ void main() {
       ),
     );
 
-    // Verify that the title 'Visual Journal' is rendered in the AppBar.
-    expect(find.text('Visual Journal'), findsOneWidget);
+    // Verify that the title 'Photo & Video Journal App' is rendered in the AppBar.
+    expect(find.text('Photo & Video Journal App'), findsOneWidget);
   });
 }

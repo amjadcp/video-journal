@@ -56,7 +56,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Visual Journal'),
+        title: const Text('Photo & Video Journal App'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),
