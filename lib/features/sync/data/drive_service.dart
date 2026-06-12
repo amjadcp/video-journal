@@ -104,6 +104,13 @@ class DriveService {
       return true;
     } catch (e, stackTrace) {
       AppLogger.error(LogCategory.sync, 'Failed downloading file from Drive', e, stackTrace);
+      // Clean up partial or empty files if created
+      try {
+        final file = File(localSavePath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
       return false;
     }
   }
@@ -114,6 +121,7 @@ class DriveService {
         q: "'$folderId' in parents and trashed = false",
         spaces: 'drive',
         $fields: 'files(id, name, mimeType, size, createdTime)',
+        pageSize: 1000,
       );
       return list.files ?? [];
     } catch (e, stackTrace) {

@@ -74,6 +74,7 @@ void main() {
         updatedAt: DateTime.now(),
         syncStatus: SyncStatus.notBackedUp,
         assetHash: 'hash123',
+        isDeleted: false,
       );
 
       await repository.saveAsset(asset);
@@ -97,6 +98,7 @@ void main() {
         updatedAt: DateTime.now(),
         syncStatus: SyncStatus.notBackedUp,
         assetHash: 'hash456',
+        isDeleted: false,
       );
 
       await repository.saveAsset(asset);
@@ -130,6 +132,45 @@ void main() {
       await repository.deleteTag(tagId);
       final emptyTags = await repository.getTagsForAsset(assetId);
       expect(emptyTags, isEmpty);
+    });
+
+    test('Visual asset soft delete behavior', () async {
+      final assetId = const Uuid().v4();
+      final asset = VisualAssetData(
+        id: assetId,
+        assetType: AssetType.photo,
+        localPath: 'soft_delete_test.png',
+        thumbnailPath: 'soft_delete_test.png',
+        autoTag: '26-06-12-05-00',
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        syncStatus: SyncStatus.notBackedUp,
+        assetHash: 'hash789',
+        isDeleted: false,
+      );
+
+      await repository.saveAsset(asset);
+
+      // Verify it exists initially
+      final initialAssets = await repository.getAllAssets();
+      expect(initialAssets.any((a) => a.id == assetId), isTrue);
+
+      // Perform soft delete
+      await repository.deleteAsset(assetId);
+
+      // Verify it is excluded from repository listings
+      final postDeleteAssets = await repository.getAllAssets();
+      expect(postDeleteAssets.any((a) => a.id == assetId), isFalse);
+
+      final retrieved = await repository.getAssetById(assetId);
+      expect(retrieved, isNull);
+
+      // Verify it still exists in the raw database with isDeleted = true
+      final rawAsset = await (database.select(database.visualAssets)
+            ..where((t) => t.id.equals(assetId)))
+          .getSingleOrNull();
+      expect(rawAsset, isNotNull);
+      expect(rawAsset!.isDeleted, isTrue);
     });
   });
 }

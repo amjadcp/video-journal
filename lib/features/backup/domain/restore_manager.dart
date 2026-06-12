@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -6,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/core/logging/app_logger.dart';
 import 'package:video_journal/core/storage/database.dart';
+import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:video_journal/features/sync/data/drive_service.dart';
 import 'package:video_journal/shared/enums/enums.dart';
 
@@ -30,9 +32,10 @@ class RestoreManager {
     required String accessToken,
     required String rootFolderId,
     Function(RestoreProgress progress)? onProgress,
+    drive.DriveApi? driveApi,
   }) async {
     final localRepo = _ref.read(journalRepositoryProvider);
-    final api = DriveService.getDriveApi(accessToken);
+    final api = driveApi ?? DriveService.getDriveApi(accessToken);
 
     File? tempDbFile;
     JournalDatabase? remoteDb;
@@ -43,6 +46,7 @@ class RestoreManager {
 
       // List files in the root folder
       final remoteFiles = await DriveService.listFiles(api, rootFolderId);
+      final remoteFileIds = remoteFiles.map((f) => f.id).toSet();
       final dbBackupFile = remoteFiles.firstWhere(
         (f) => f.name == 'journal_backup.db',
         orElse: () => throw Exception('No database backup file found in Drive'),
@@ -82,7 +86,7 @@ class RestoreManager {
       // 2. Restore Visual Assets (with duplicate prevention checks)
       onProgress?.call(RestoreProgress(totalItems: 10, currentItemIndex: 4, status: 'Restoring assets...'));
       final remoteAssets = await remoteDb.select(remoteDb.visualAssets).get();
-      final localAssets = await localRepo.getAllAssets();
+      final localDb = _ref.read(journalDatabaseProvider);
 
       final docDir = await getApplicationDocumentsDirectory();
       final localMediaDir = Directory(p.join(docDir.path, 'media'));
@@ -100,15 +104,15 @@ class RestoreManager {
           status: 'Restoring asset ${i + 1} of $totalAssets...',
         ));
 
-        // Check duplicates: UUID, Hash, or Drive ID
-        VisualAssetData? duplicate;
-        for (final la in localAssets) {
-          if (la.id == rAsset.id ||
-              la.assetHash == rAsset.assetHash ||
-              (la.driveFileId != null && la.driveFileId == rAsset.driveFileId)) {
-            duplicate = la;
-            break;
-          }
+        // Find if it already exists in the local database (even if soft-deleted)
+        final localAsset = await (localDb.select(localDb.visualAssets)..where((t) => t.id.equals(rAsset.id))).getSingleOrNull();
+
+        // Check if there is a duplicate by hash or drive id if the ID doesn't match
+        VisualAssetData? duplicate = localAsset;
+        if (duplicate == null) {
+          final query = localDb.select(localDb.visualAssets)
+            ..where((t) => t.assetHash.equals(rAsset.assetHash) | (t.driveFileId.isNotNull() & t.driveFileId.equals(rAsset.driveFileId ?? '')));
+          duplicate = await query.getSingleOrNull();
         }
 
         final assetExistsLocally = duplicate != null;
@@ -125,33 +129,45 @@ class RestoreManager {
         }
 
         // If the media file is not on disk, download it
-        if (!fileExistsLocally && rAsset.driveFileId != null) {
-          AppLogger.info(LogCategory.restore, 'Downloading missing asset file: ${rAsset.id}');
-          final downloaded = await DriveService.downloadFile(
-            api: api,
-            fileId: rAsset.driveFileId!,
-            localSavePath: targetLocalPath,
-          );
-          if (!downloaded) {
-            AppLogger.warning(LogCategory.restore, 'Failed downloading file for asset: ${rAsset.id}');
-            continue; // Skip database record save if file download failed
+        if (!fileExistsLocally) {
+          final fileId = rAsset.driveFileId;
+          final isFileOnDrive = fileId != null && remoteFileIds.contains(fileId);
+          
+          if (isFileOnDrive) {
+            AppLogger.info(LogCategory.restore, 'Downloading missing asset file: ${rAsset.id}');
+            final downloaded = await DriveService.downloadFile(
+              api: api,
+              fileId: fileId,
+              localSavePath: targetLocalPath,
+            );
+            if (!downloaded) {
+              AppLogger.warning(LogCategory.restore, 'Failed downloading file for asset: ${rAsset.id}');
+              continue; // Skip database record save if file download failed
+            }
+          } else {
+            // File is missing locally and either has no Drive ID or the file is not present in the Drive folder.
+            // Skip restoring this database record as the media is unrecoverable.
+            AppLogger.warning(LogCategory.restore, 'Asset ${rAsset.id} has no valid Drive backup file. Skipping.');
+            continue;
           }
         }
 
-        // Save/Update asset metadata locally with verified local path
+        // Save/Update asset metadata locally with verified local path and set isDeleted = false (undelete)
         if (!assetExistsLocally) {
           final restoredAsset = rAsset.copyWith(
             localPath: targetLocalPath,
             thumbnailPath: targetLocalPath, // Use same path for simple MVP thumbnail
             syncStatus: SyncStatus.synced,
+            isDeleted: false, // Ensure it is NOT marked as deleted
           );
           await localRepo.saveAsset(restoredAsset);
-        } else if (!fileExistsLocally) {
-          // File was missing but metadata existed; update path and set synced
-          final updatedAsset = duplicate!.copyWith(
+        } else if (!fileExistsLocally || duplicate.isDeleted) {
+          // File was missing or metadata existed but was soft-deleted; update path, sync, and set isDeleted = false
+          final updatedAsset = duplicate.copyWith(
             localPath: targetLocalPath,
             thumbnailPath: targetLocalPath,
             syncStatus: SyncStatus.synced,
+            isDeleted: false, // Ensure it is NOT marked as deleted
           );
           await localRepo.updateAsset(updatedAsset);
         }

@@ -10,6 +10,7 @@ class JournalRepositoryImpl implements JournalRepository {
   @override
   Future<List<VisualAssetData>> getAllAssets() {
     return (_db.select(_db.visualAssets)
+          ..where((t) => t.isDeleted.equals(false))
           ..orderBy([
             (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
           ]))
@@ -18,7 +19,8 @@ class JournalRepositoryImpl implements JournalRepository {
 
   @override
   Future<VisualAssetData?> getAssetById(String id) {
-    return (_db.select(_db.visualAssets)..where((t) => t.id.equals(id)))
+    return (_db.select(_db.visualAssets)
+          ..where((t) => t.id.equals(id) & t.isDeleted.equals(false)))
         .getSingleOrNull();
   }
 
@@ -34,13 +36,14 @@ class JournalRepositoryImpl implements JournalRepository {
 
   @override
   Future<void> deleteAsset(String id) async {
-    await (_db.delete(_db.visualAssets)..where((t) => t.id.equals(id))).go();
+    await (_db.update(_db.visualAssets)..where((t) => t.id.equals(id)))
+        .write(const VisualAssetsCompanion(isDeleted: Value(true)));
   }
 
   @override
   Future<List<VisualAssetData>> getAssetsInFolder(String folderId) {
     return (_db.select(_db.visualAssets)
-          ..where((t) => t.folderId.equals(folderId))
+          ..where((t) => t.folderId.equals(folderId) & t.isDeleted.equals(false))
           ..orderBy([
             (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc)
           ]))
@@ -115,7 +118,7 @@ class JournalRepositoryImpl implements JournalRepository {
     final query = _db.select(_db.visualAssets).join([
       innerJoin(_db.tags, _db.tags.visualAssetId.equalsExp(_db.visualAssets.id)),
     ])
-      ..where(_db.tags.name.equals(tagName))
+      ..where(_db.tags.name.equals(tagName) & _db.visualAssets.isDeleted.equals(false))
       ..orderBy([OrderingTerm(expression: _db.visualAssets.createdAt, mode: OrderingMode.desc)]);
 
     final rows = await query.get();

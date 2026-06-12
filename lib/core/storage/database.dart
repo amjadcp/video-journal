@@ -20,6 +20,7 @@ class VisualAssets extends Table {
   TextColumn get syncStatus => textEnum<SyncStatus>()();
   TextColumn get driveFileId => text().nullable()();
   TextColumn get assetHash => text()();
+  BoolColumn get isDeleted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};
@@ -56,7 +57,7 @@ class JournalDatabase extends _$JournalDatabase {
   JournalDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration {
@@ -64,6 +65,11 @@ class JournalDatabase extends _$JournalDatabase {
       beforeOpen: (details) async {
         // Enable foreign keys in SQLite (important for cascade deletes)
         await customStatement('PRAGMA foreign_keys = ON');
+      },
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          await m.addColumn(visualAssets, visualAssets.isDeleted);
+        }
       },
     );
   }

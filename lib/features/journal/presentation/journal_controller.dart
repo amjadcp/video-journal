@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/core/storage/database.dart';
 import 'package:video_journal/features/folders/presentation/folders_controller.dart';
+import 'package:video_journal/features/sync/data/drive_service.dart';
 import 'package:video_journal/shared/enums/enums.dart';
 
 class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>> {
@@ -50,6 +51,7 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
       updatedAt: DateTime.now(),
       syncStatus: SyncStatus.notBackedUp,
       assetHash: hash,
+      isDeleted: false,
     );
 
     await repo.saveAsset(asset);
@@ -85,6 +87,7 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
       updatedAt: DateTime.now(),
       syncStatus: SyncStatus.notBackedUp,
       assetHash: hash,
+      isDeleted: false,
     );
 
     await repo.saveAsset(asset);
@@ -96,7 +99,48 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
 
   Future<void> deleteAsset(String assetId) async {
     final repo = _ref.read(journalRepositoryProvider);
+    
+    // Retrieve the asset before soft-deleting it so we have its paths and driveFileId
+    final asset = await repo.getAssetById(assetId);
+    
+    // Soft-delete local entry in the database
     await repo.deleteAsset(assetId);
+
+    if (asset != null) {
+      // 1. Delete local physical files from disk
+      try {
+        final localFile = File(asset.localPath);
+        if (await localFile.exists()) {
+          await localFile.delete();
+        }
+        final thumbFile = File(asset.thumbnailPath);
+        if (await thumbFile.exists() && asset.thumbnailPath != asset.localPath) {
+          await thumbFile.delete();
+        }
+      } catch (e) {
+        // Silence filesystem deletion errors so database deletion remains robust
+      }
+
+      // 2. If the asset is backed up to Drive, delete it if enabled
+      if (asset.driveFileId != null) {
+        final settingsRepo = _ref.read(settingsRepositoryProvider);
+        final deleteCloud = await settingsRepo.isDeleteCloudCopyEnabled();
+        
+        if (deleteCloud) {
+          final authRepo = _ref.read(authRepositoryProvider);
+          final token = await authRepo.getAccessToken();
+          if (token != null) {
+            try {
+              final api = DriveService.getDriveApi(token);
+              await api.files.delete(asset.driveFileId!);
+            } catch (e) {
+              // Silence cloud deletion errors
+            }
+          }
+        }
+      }
+    }
+    
     await loadAssets();
   }
 }

@@ -33,9 +33,10 @@ class BackupManager {
     required String accessToken,
     required String rootFolderId,
     Function(BackupProgress progress)? onProgress,
+    drive.DriveApi? driveApi,
   }) async {
     final repo = _ref.read(journalRepositoryProvider);
-    final api = DriveService.getDriveApi(accessToken);
+    final api = driveApi ?? DriveService.getDriveApi(accessToken);
 
     try {
       AppLogger.info(LogCategory.backup, 'Starting incremental backup to folder: $rootFolderId');

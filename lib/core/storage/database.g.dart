@@ -490,6 +490,21 @@ class $VisualAssetsTable extends VisualAssets
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isDeletedMeta = const VerificationMeta(
+    'isDeleted',
+  );
+  @override
+  late final GeneratedColumn<bool> isDeleted = GeneratedColumn<bool>(
+    'is_deleted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_deleted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -503,6 +518,7 @@ class $VisualAssetsTable extends VisualAssets
     syncStatus,
     driveFileId,
     assetHash,
+    isDeleted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -587,6 +603,12 @@ class $VisualAssetsTable extends VisualAssets
     } else if (isInserting) {
       context.missing(_assetHashMeta);
     }
+    if (data.containsKey('is_deleted')) {
+      context.handle(
+        _isDeletedMeta,
+        isDeleted.isAcceptableOrUnknown(data['is_deleted']!, _isDeletedMeta),
+      );
+    }
     return context;
   }
 
@@ -644,6 +666,10 @@ class $VisualAssetsTable extends VisualAssets
         DriftSqlType.string,
         data['${effectivePrefix}asset_hash'],
       )!,
+      isDeleted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_deleted'],
+      )!,
     );
   }
 
@@ -670,6 +696,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
   final SyncStatus syncStatus;
   final String? driveFileId;
   final String assetHash;
+  final bool isDeleted;
   const VisualAssetData({
     required this.id,
     required this.assetType,
@@ -682,6 +709,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
     required this.syncStatus,
     this.driveFileId,
     required this.assetHash,
+    required this.isDeleted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -709,6 +737,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
       map['drive_file_id'] = Variable<String>(driveFileId);
     }
     map['asset_hash'] = Variable<String>(assetHash);
+    map['is_deleted'] = Variable<bool>(isDeleted);
     return map;
   }
 
@@ -729,6 +758,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
           ? const Value.absent()
           : Value(driveFileId),
       assetHash: Value(assetHash),
+      isDeleted: Value(isDeleted),
     );
   }
 
@@ -753,6 +783,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
       ),
       driveFileId: serializer.fromJson<String?>(json['driveFileId']),
       assetHash: serializer.fromJson<String>(json['assetHash']),
+      isDeleted: serializer.fromJson<bool>(json['isDeleted']),
     );
   }
   @override
@@ -774,6 +805,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
       ),
       'driveFileId': serializer.toJson<String?>(driveFileId),
       'assetHash': serializer.toJson<String>(assetHash),
+      'isDeleted': serializer.toJson<bool>(isDeleted),
     };
   }
 
@@ -789,6 +821,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
     SyncStatus? syncStatus,
     Value<String?> driveFileId = const Value.absent(),
     String? assetHash,
+    bool? isDeleted,
   }) => VisualAssetData(
     id: id ?? this.id,
     assetType: assetType ?? this.assetType,
@@ -801,6 +834,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
     syncStatus: syncStatus ?? this.syncStatus,
     driveFileId: driveFileId.present ? driveFileId.value : this.driveFileId,
     assetHash: assetHash ?? this.assetHash,
+    isDeleted: isDeleted ?? this.isDeleted,
   );
   VisualAssetData copyWithCompanion(VisualAssetsCompanion data) {
     return VisualAssetData(
@@ -821,6 +855,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
           ? data.driveFileId.value
           : this.driveFileId,
       assetHash: data.assetHash.present ? data.assetHash.value : this.assetHash,
+      isDeleted: data.isDeleted.present ? data.isDeleted.value : this.isDeleted,
     );
   }
 
@@ -837,7 +872,8 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('syncStatus: $syncStatus, ')
           ..write('driveFileId: $driveFileId, ')
-          ..write('assetHash: $assetHash')
+          ..write('assetHash: $assetHash, ')
+          ..write('isDeleted: $isDeleted')
           ..write(')'))
         .toString();
   }
@@ -855,6 +891,7 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
     syncStatus,
     driveFileId,
     assetHash,
+    isDeleted,
   );
   @override
   bool operator ==(Object other) =>
@@ -870,7 +907,8 @@ class VisualAssetData extends DataClass implements Insertable<VisualAssetData> {
           other.updatedAt == this.updatedAt &&
           other.syncStatus == this.syncStatus &&
           other.driveFileId == this.driveFileId &&
-          other.assetHash == this.assetHash);
+          other.assetHash == this.assetHash &&
+          other.isDeleted == this.isDeleted);
 }
 
 class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
@@ -885,6 +923,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
   final Value<SyncStatus> syncStatus;
   final Value<String?> driveFileId;
   final Value<String> assetHash;
+  final Value<bool> isDeleted;
   final Value<int> rowid;
   const VisualAssetsCompanion({
     this.id = const Value.absent(),
@@ -898,6 +937,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
     this.syncStatus = const Value.absent(),
     this.driveFileId = const Value.absent(),
     this.assetHash = const Value.absent(),
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   VisualAssetsCompanion.insert({
@@ -912,6 +952,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
     required SyncStatus syncStatus,
     this.driveFileId = const Value.absent(),
     required String assetHash,
+    this.isDeleted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        assetType = Value(assetType),
@@ -934,6 +975,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
     Expression<String>? syncStatus,
     Expression<String>? driveFileId,
     Expression<String>? assetHash,
+    Expression<bool>? isDeleted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -948,6 +990,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
       if (syncStatus != null) 'sync_status': syncStatus,
       if (driveFileId != null) 'drive_file_id': driveFileId,
       if (assetHash != null) 'asset_hash': assetHash,
+      if (isDeleted != null) 'is_deleted': isDeleted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -964,6 +1007,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
     Value<SyncStatus>? syncStatus,
     Value<String?>? driveFileId,
     Value<String>? assetHash,
+    Value<bool>? isDeleted,
     Value<int>? rowid,
   }) {
     return VisualAssetsCompanion(
@@ -978,6 +1022,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
       syncStatus: syncStatus ?? this.syncStatus,
       driveFileId: driveFileId ?? this.driveFileId,
       assetHash: assetHash ?? this.assetHash,
+      isDeleted: isDeleted ?? this.isDeleted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1022,6 +1067,9 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
     if (assetHash.present) {
       map['asset_hash'] = Variable<String>(assetHash.value);
     }
+    if (isDeleted.present) {
+      map['is_deleted'] = Variable<bool>(isDeleted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1042,6 +1090,7 @@ class VisualAssetsCompanion extends UpdateCompanion<VisualAssetData> {
           ..write('syncStatus: $syncStatus, ')
           ..write('driveFileId: $driveFileId, ')
           ..write('assetHash: $assetHash, ')
+          ..write('isDeleted: $isDeleted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1765,6 +1814,7 @@ typedef $$VisualAssetsTableCreateCompanionBuilder =
       required SyncStatus syncStatus,
       Value<String?> driveFileId,
       required String assetHash,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 typedef $$VisualAssetsTableUpdateCompanionBuilder =
@@ -1780,6 +1830,7 @@ typedef $$VisualAssetsTableUpdateCompanionBuilder =
       Value<SyncStatus> syncStatus,
       Value<String?> driveFileId,
       Value<String> assetHash,
+      Value<bool> isDeleted,
       Value<int> rowid,
     });
 
@@ -1885,6 +1936,11 @@ class $$VisualAssetsTableFilterComposer
 
   ColumnFilters<String> get assetHash => $composableBuilder(
     column: $table.assetHash,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1996,6 +2052,11 @@ class $$VisualAssetsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isDeleted => $composableBuilder(
+    column: $table.isDeleted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FoldersTableOrderingComposer get folderId {
     final $$FoldersTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2065,6 +2126,9 @@ class $$VisualAssetsTableAnnotationComposer
 
   GeneratedColumn<String> get assetHash =>
       $composableBuilder(column: $table.assetHash, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDeleted =>
+      $composableBuilder(column: $table.isDeleted, builder: (column) => column);
 
   $$FoldersTableAnnotationComposer get folderId {
     final $$FoldersTableAnnotationComposer composer = $composerBuilder(
@@ -2156,6 +2220,7 @@ class $$VisualAssetsTableTableManager
                 Value<SyncStatus> syncStatus = const Value.absent(),
                 Value<String?> driveFileId = const Value.absent(),
                 Value<String> assetHash = const Value.absent(),
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VisualAssetsCompanion(
                 id: id,
@@ -2169,6 +2234,7 @@ class $$VisualAssetsTableTableManager
                 syncStatus: syncStatus,
                 driveFileId: driveFileId,
                 assetHash: assetHash,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -2184,6 +2250,7 @@ class $$VisualAssetsTableTableManager
                 required SyncStatus syncStatus,
                 Value<String?> driveFileId = const Value.absent(),
                 required String assetHash,
+                Value<bool> isDeleted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => VisualAssetsCompanion.insert(
                 id: id,
@@ -2197,6 +2264,7 @@ class $$VisualAssetsTableTableManager
                 syncStatus: syncStatus,
                 driveFileId: driveFileId,
                 assetHash: assetHash,
+                isDeleted: isDeleted,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
