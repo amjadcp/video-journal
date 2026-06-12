@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class VideoTrimmer extends StatefulWidget {
   final double totalDurationSeconds;
   final Function(double start, double end) onTrimChanged;
+  final VoidCallback? onTrimStart;
+  final Function(double start, double end)? onTrimEnd;
 
   const VideoTrimmer({
     super.key,
     required this.totalDurationSeconds,
     required this.onTrimChanged,
+    this.onTrimStart,
+    this.onTrimEnd,
   });
 
   @override
@@ -21,6 +25,16 @@ class _VideoTrimmerState extends State<VideoTrimmer> {
   void initState() {
     super.initState();
     _currentRange = RangeValues(0.0, widget.totalDurationSeconds);
+  }
+
+  @override
+  void didUpdateWidget(VideoTrimmer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.totalDurationSeconds != widget.totalDurationSeconds) {
+      setState(() {
+        _currentRange = RangeValues(0.0, widget.totalDurationSeconds);
+      });
+    }
   }
 
   @override
@@ -60,6 +74,12 @@ class _VideoTrimmerState extends State<VideoTrimmer> {
               _currentRange.start.toStringAsFixed(1),
               _currentRange.end.toStringAsFixed(1),
             ),
+            onChangeStart: (RangeValues values) {
+              widget.onTrimStart?.call();
+            },
+            onChangeEnd: (RangeValues values) {
+              widget.onTrimEnd?.call(values.start, values.end);
+            },
             onChanged: (RangeValues values) {
               setState(() {
                 // Ensure at least 1 second length is selected

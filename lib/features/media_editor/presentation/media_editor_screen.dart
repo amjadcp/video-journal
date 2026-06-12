@@ -57,8 +57,21 @@ class _MediaEditorScreenState extends ConsumerState<MediaEditorScreen> {
 
   @override
   void dispose() {
+    _videoPlayerController?.removeListener(_videoPlayerListener);
     _videoPlayerController?.dispose();
     super.dispose();
+  }
+
+  void _videoPlayerListener() {
+    final controller = _videoPlayerController;
+    if (controller == null || !controller.value.isInitialized || !controller.value.isPlaying) return;
+
+    final position = controller.value.position.inMilliseconds / 1000.0;
+    
+    // Loop back to start if it exceeds end trim
+    if (position >= _videoEnd) {
+      controller.seekTo(Duration(milliseconds: (_videoStart * 1000).toInt()));
+    }
   }
 
   Future<void> _initVideo() async {
@@ -69,7 +82,9 @@ class _MediaEditorScreenState extends ConsumerState<MediaEditorScreen> {
       setState(() {
         _videoEnd = controller.value.duration.inMilliseconds / 1000.0;
       });
-      controller.setLooping(true);
+      controller.setLooping(false); // Loop manually within the trim range
+      controller.addListener(_videoPlayerListener);
+      await controller.seekTo(Duration(milliseconds: (_videoStart * 1000).toInt()));
       controller.play();
     } catch (e, stackTrace) {
       AppLogger.error(LogCategory.editor, 'Failed to initialize video player', e, stackTrace);
@@ -145,13 +160,18 @@ class _MediaEditorScreenState extends ConsumerState<MediaEditorScreen> {
         savedPath = file.path;
       } else {
         // Video trim
-        if (_videoPlayerController != null) {
-          final trimmed = await VideoProcessor.trimVideo(
-            inputPath: widget.mediaPath,
-            startSeconds: _videoStart,
-            endSeconds: _videoEnd,
-          );
-          savedPath = trimmed ?? widget.mediaPath;
+        if (_videoPlayerController != null && _videoPlayerController!.value.isInitialized) {
+          final totalDuration = _videoPlayerController!.value.duration.inMilliseconds / 1000.0;
+          if (_videoStart > 0.1 || _videoEnd < totalDuration - 0.1) {
+            final trimmed = await VideoProcessor.trimVideo(
+              inputPath: widget.mediaPath,
+              startSeconds: _videoStart,
+              endSeconds: _videoEnd,
+            );
+            savedPath = trimmed ?? widget.mediaPath;
+          } else {
+            savedPath = widget.mediaPath;
+          }
         } else {
           savedPath = widget.mediaPath;
         }
@@ -259,41 +279,32 @@ class _MediaEditorScreenState extends ConsumerState<MediaEditorScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Color Picker Row (horizontal small circles)
-                Container(
-                  height: 48,
-                  alignment: Alignment.center,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    shrinkWrap: true,
-                    children: [Colors.greenAccent, Colors.redAccent, Colors.yellowAccent, Colors.blueAccent, Colors.white, Colors.orangeAccent]
-                        .map((c) => GestureDetector(
-                              onTap: () => setState(() => _drawColor = c),
-                              child: Container(
-                                margin: const EdgeInsets.symmetric(horizontal: 8),
-                                width: 28,
-                                height: 28,
-                                decoration: BoxDecoration(
-                                  color: c,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: _drawColor == c ? Colors.white : Colors.transparent,
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                ),
 
                 // Video Trim Slider or Photo Filter List
-                if (isVideo && _videoPlayerController != null)
+                if (isVideo && _videoPlayerController != null && _videoPlayerController!.value.isInitialized)
                   VideoTrimmer(
                     totalDurationSeconds: _videoPlayerController!.value.duration.inMilliseconds / 1000.0,
+                    onTrimStart: () {
+                      _videoPlayerController?.pause();
+                    },
+                    onTrimEnd: (start, end) {
+                      _videoPlayerController?.seekTo(Duration(milliseconds: (start * 1000).toInt()));
+                      _videoPlayerController?.play();
+                    },
                     onTrimChanged: (start, end) {
+                      final startChanged = (start - _videoStart).abs() > 0.01;
+                      final endChanged = (end - _videoEnd).abs() > 0.01;
+                      
                       _videoStart = start;
                       _videoEnd = end;
+                      
+                      if (_videoPlayerController != null && _videoPlayerController!.value.isInitialized) {
+                        if (startChanged) {
+                          _videoPlayerController!.seekTo(Duration(milliseconds: (start * 1000).toInt()));
+                        } else if (endChanged) {
+                          _videoPlayerController!.seekTo(Duration(milliseconds: (end * 1000).toInt()));
+                        }
+                      }
                     },
                   )
                 else if (!isVideo)

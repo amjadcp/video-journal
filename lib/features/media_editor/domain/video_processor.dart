@@ -17,8 +17,9 @@ class VideoProcessor {
       final outputName = 'trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final outputPath = p.join(tempDir.path, outputName);
 
-      // Execute stream-copy trimming (extremely fast)
-      final command = '-y -ss $startSeconds -to $endSeconds -i "$inputPath" -c copy "$outputPath"';
+      // Execute stream-copy trimming (extremely fast and keyframe-accurate)
+      final duration = endSeconds - startSeconds;
+      final command = '-y -ss $startSeconds -i "$inputPath" -t $duration -c copy "$outputPath"';
       
       AppLogger.info(LogCategory.editor, 'Trimming video with command: $command');
       final session = await FFmpegKit.execute(command);
