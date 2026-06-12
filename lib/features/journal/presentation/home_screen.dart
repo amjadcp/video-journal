@@ -288,6 +288,18 @@ class HomeScreen extends ConsumerWidget {
                               child: Image.file(
                                 File(asset.thumbnailPath),
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[900],
+                                    child: Center(
+                                      child: Icon(
+                                        isVideo ? Icons.videocam : Icons.image,
+                                        color: Colors.white24,
+                                        size: 28,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             Positioned(

@@ -154,7 +154,7 @@ class _MediaEditorScreenState extends ConsumerState<MediaEditorScreen> {
         final pngBytes = byteData!.buffer.asUint8List();
 
         final tempDir = await getTemporaryDirectory();
-        final fileName = 'edited_${DateTime.now().millisecondsSinceEpoch}.png';
+        final fileName = 'photo_${DateTime.now().millisecondsSinceEpoch}.png';
         final file = File('${tempDir.path}/$fileName');
         await file.writeAsBytes(pngBytes);
         savedPath = file.path;

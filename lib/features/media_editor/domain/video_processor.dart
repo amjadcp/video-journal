@@ -14,7 +14,7 @@ class VideoProcessor {
   }) async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final outputName = 'trimmed_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final outputName = 'REC_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final outputPath = p.join(tempDir.path, outputName);
 
       // Execute stream-copy trimming (extremely fast and keyframe-accurate)
