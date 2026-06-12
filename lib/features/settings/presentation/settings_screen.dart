@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:sign_in_button/sign_in_button.dart';
 import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/core/logging/app_logger.dart';
 import 'package:video_journal/features/backup/data/backup_worker.dart';
@@ -253,10 +254,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 children: [
                                   const Text('Sign in to backup your visual journals to Google Drive.', style: TextStyle(color: Colors.grey, fontSize: 13)),
                                   const SizedBox(height: 16),
-                                  ElevatedButton.icon(
+                                  SignInButton(
+                                    Buttons.google,
+                                    text: "Connect Google Drive",
                                     onPressed: _handleGoogleSignIn,
-                                    icon: const Icon(Icons.login),
-                                    label: const Text('Connect Google Drive'),
                                   ),
                                 ],
                               )
