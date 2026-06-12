@@ -177,6 +177,13 @@ class RestoreManager {
       onProgress?.call(RestoreProgress(totalItems: 10, currentItemIndex: 9, status: 'Restoring tags...'));
       final remoteTags = await remoteDb.select(remoteDb.tags).get();
       for (final rTag in remoteTags) {
+        // Ensure the associated asset exists in the local database to avoid foreign key violations (e.g. if the asset was skipped)
+        final assetInDb = await (localDb.select(localDb.visualAssets)..where((t) => t.id.equals(rTag.visualAssetId))).getSingleOrNull();
+        if (assetInDb == null) {
+          AppLogger.warning(LogCategory.restore, 'Skipping tag ${rTag.name} because its associated asset ${rTag.visualAssetId} is missing locally');
+          continue;
+        }
+
         final tagsForAsset = await localRepo.getTagsForAsset(rTag.visualAssetId);
         final tagExists = tagsForAsset.any((lt) => lt.name == rTag.name);
         if (!tagExists) {
@@ -189,11 +196,20 @@ class RestoreManager {
       AppLogger.error(LogCategory.restore, 'Failed during restore execution', e, stackTrace);
       rethrow;
     } finally {
-      // Close temporary database connection
-      await remoteDb?.close();
-      // Clean up temporary downloaded database file
-      if (tempDbFile != null && await tempDbFile.exists()) {
-        await tempDbFile.delete();
+      // Close temporary database connection safely
+      try {
+        await remoteDb?.close();
+      } catch (closeError) {
+        AppLogger.warning(LogCategory.restore, 'Failed to close remote database connection: $closeError');
+      }
+      
+      // Clean up temporary downloaded database file safely
+      try {
+        if (tempDbFile != null && await tempDbFile.exists()) {
+          await tempDbFile.delete();
+        }
+      } catch (deleteError) {
+        AppLogger.warning(LogCategory.restore, 'Failed to delete temporary database file: $deleteError');
       }
     }
   }
