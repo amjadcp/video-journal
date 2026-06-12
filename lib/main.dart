@@ -6,6 +6,7 @@ import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/app/theme/app_theme.dart';
 import 'package:video_journal/features/backup/data/backup_worker.dart';
 import 'package:video_journal/features/journal/presentation/home_screen.dart';
+import 'package:video_journal/features/journal/presentation/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -48,7 +49,7 @@ class JournalApp extends ConsumerWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
-      home: const HomeScreen(),
+      home: const SplashScreen(),
       debugShowCheckedModeBanner: false,
     );
   }
