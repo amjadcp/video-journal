@@ -37,13 +37,15 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
   Future<void> saveAssetToHomeList({
     required String mediaPath,
     required AssetType type,
+    String? caption,
   }) async {
     final repo = _ref.read(journalRepositoryProvider);
     final hash = await _calculateFileHash(mediaPath);
     final autoTag = DateFormat('yy-MM-dd-HH-mm').format(DateTime.now());
+    final assetId = const Uuid().v4();
 
     final asset = VisualAssetData(
-      id: const Uuid().v4(),
+      id: assetId,
       assetType: type,
       localPath: mediaPath,
       thumbnailPath: mediaPath, // For simple MVP, using main media path as thumbnail
@@ -56,6 +58,19 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
     );
 
     await repo.saveAsset(asset);
+
+    if (caption != null && caption.trim().isNotEmpty) {
+      final tag = TagData(
+        id: const Uuid().v4(),
+        visualAssetId: assetId,
+        name: caption.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await repo.addTag(tag);
+      _ref.invalidate(firstTagsProvider);
+    }
+
     await loadAssets();
   }
 
@@ -63,6 +78,7 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
     required String mediaPath,
     required AssetType type,
     required String folderId,
+    String? caption,
   }) async {
     final repo = _ref.read(journalRepositoryProvider);
     final hash = await _calculateFileHash(mediaPath);
@@ -76,9 +92,10 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
 
     // Apply the sequence tag (e.g. #1, #2...)
     final autoTag = '#$nextSequence';
+    final assetId = const Uuid().v4();
 
     final asset = VisualAssetData(
-      id: const Uuid().v4(),
+      id: assetId,
       assetType: type,
       localPath: mediaPath,
       thumbnailPath: mediaPath,
@@ -92,6 +109,18 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
     );
 
     await repo.saveAsset(asset);
+
+    if (caption != null && caption.trim().isNotEmpty) {
+      final tag = TagData(
+        id: const Uuid().v4(),
+        visualAssetId: assetId,
+        name: caption.trim(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+      await repo.addTag(tag);
+      _ref.invalidate(firstTagsProvider);
+    }
     
     // Refresh folder list state and main assets state
     _ref.read(foldersControllerProvider.notifier).loadFolders();

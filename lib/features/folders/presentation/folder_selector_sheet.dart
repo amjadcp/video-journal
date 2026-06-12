@@ -7,11 +7,13 @@ import 'package:video_journal/shared/enums/enums.dart';
 class FolderSelectorSheet extends ConsumerStatefulWidget {
   final String mediaPath;
   final AssetType mediaType;
+  final bool selectOnly;
 
   const FolderSelectorSheet({
     super.key,
     required this.mediaPath,
     required this.mediaType,
+    this.selectOnly = false,
   });
 
   @override
@@ -22,6 +24,10 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
   bool _isSaving = false;
 
   Future<void> _saveToHome() async {
+    if (widget.selectOnly) {
+      Navigator.pop(context, {'id': null, 'name': 'Home Journal'});
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       await ref.read(journalControllerProvider.notifier).saveAssetToHomeList(
@@ -42,7 +48,11 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
     }
   }
 
-  Future<void> _saveToFolder(String folderId) async {
+  Future<void> _saveToFolder(String folderId, String folderName) async {
+    if (widget.selectOnly) {
+      Navigator.pop(context, {'id': folderId, 'name': folderName});
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       await ref.read(journalControllerProvider.notifier).saveAssetToFolder(
@@ -81,7 +91,7 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
             onPressed: () => Navigator.pop(context),
           ),
           TextButton(
-            child: const Text('Create & Save'),
+            child: Text(widget.selectOnly ? 'Create & Select' : 'Create & Save'),
             onPressed: () async {
               if (folderName.trim().isNotEmpty) {
                 Navigator.pop(context); // close dialog
@@ -90,7 +100,13 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
                   final newFolder = await ref
                       .read(foldersControllerProvider.notifier)
                       .createFolder(folderName.trim());
-                  await _saveToFolder(newFolder.id);
+                  if (widget.selectOnly) {
+                    if (mounted) {
+                      Navigator.pop(context, {'id': newFolder.id, 'name': newFolder.name});
+                    }
+                  } else {
+                    await _saveToFolder(newFolder.id, newFolder.name);
+                  }
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -125,7 +141,7 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Save Memory',
+            widget.selectOnly ? 'Select Destination' : 'Save Memory',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
@@ -200,7 +216,7 @@ class _FolderSelectorSheetState extends ConsumerState<FolderSelectorSheet> {
                                 title: Text(folder.name),
                                 subtitle: Text('${folder.sequenceCounter} items'),
                                 trailing: const Icon(Icons.chevron_right),
-                                onTap: () => _saveToFolder(folder.id),
+                                onTap: () => _saveToFolder(folder.id, folder.name),
                               );
                             },
                           );

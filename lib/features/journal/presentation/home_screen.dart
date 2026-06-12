@@ -250,6 +250,7 @@ class HomeScreen extends ConsumerWidget {
       },
       child: DefaultTabController(
         length: 2,
+        initialIndex: 1,
         child: Scaffold(
           appBar: AppBar(
             leading: isSelectionMode
