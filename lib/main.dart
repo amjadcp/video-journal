@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/app/theme/app_theme.dart';
 import 'package:video_journal/features/backup/data/backup_worker.dart';
 import 'package:video_journal/features/journal/presentation/home_screen.dart';
@@ -35,16 +36,18 @@ void main() async {
   );
 }
 
-class JournalApp extends StatelessWidget {
+class JournalApp extends ConsumerWidget {
   const JournalApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'Visual Journal',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: const HomeScreen(),
       debugShowCheckedModeBanner: false,
     );

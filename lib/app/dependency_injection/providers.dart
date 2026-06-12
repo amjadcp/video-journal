@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -43,4 +44,40 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 // Auth State Provider
 final authStateProvider = StreamProvider<User?>((ref) {
   return ref.watch(authRepositoryProvider).authStateChanges;
+});
+
+// Theme Mode Notifier & Provider
+class ThemeModeNotifier extends StateNotifier<ThemeMode> {
+  final SettingsRepository _settingsRepository;
+
+  ThemeModeNotifier(this._settingsRepository) : super(ThemeMode.system) {
+    _loadThemeMode();
+  }
+
+  Future<void> _loadThemeMode() async {
+    final modeStr = await _settingsRepository.getThemeMode();
+    state = _parseThemeMode(modeStr);
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    state = mode;
+    await _settingsRepository.setThemeMode(mode.name);
+  }
+
+  ThemeMode _parseThemeMode(String? modeStr) {
+    switch (modeStr) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      case 'system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+}
+
+final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
+  final settingsRepo = ref.watch(settingsRepositoryProvider);
+  return ThemeModeNotifier(settingsRepo);
 });

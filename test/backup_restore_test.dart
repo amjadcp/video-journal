@@ -189,6 +189,14 @@ class FakeSettingsRepository implements SettingsRepository {
 
   @override
   Future<void> setLastBackupTime(String? timeStr) async => lastBackup = timeStr;
+
+  String? themeMode = 'system';
+
+  @override
+  Future<String?> getThemeMode() async => themeMode;
+
+  @override
+  Future<void> setThemeMode(String mode) async => themeMode = mode;
 }
 
 // Fake implementation of AuthRepository

@@ -71,4 +71,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
     }
     return _storage.write(key: _keyLastBackup, value: timeStr);
   }
+
+  static const _keyThemeMode = 'theme_mode';
+
+  @override
+  Future<String?> getThemeMode() {
+    return _storage.read(key: _keyThemeMode);
+  }
+
+  @override
+  Future<void> setThemeMode(String mode) {
+    return _storage.write(key: _keyThemeMode, value: mode);
+  }
 }

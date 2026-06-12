@@ -13,4 +13,7 @@ abstract class SettingsRepository {
 
   Future<String?> getLastBackupTime();
   Future<void> setLastBackupTime(String? timeStr);
+
+  Future<String?> getThemeMode();
+  Future<void> setThemeMode(String mode);
 }

@@ -286,6 +286,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const SizedBox(height: 16),
 
+                // Appearance Section (Theme selection toggle)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text('Appearance', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        SwitchListTile(
+                          title: const Text('Dark Mode'),
+                          subtitle: const Text('Toggle between Light and Dark theme'),
+                          value: ref.watch(themeModeProvider) == ThemeMode.dark ||
+                              (ref.watch(themeModeProvider) == ThemeMode.system &&
+                                  MediaQuery.of(context).platformBrightness == Brightness.dark),
+                          onChanged: (bool isDark) {
+                            ref.read(themeModeProvider.notifier).setThemeMode(
+                                  isDark ? ThemeMode.dark : ThemeMode.light,
+                                );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 // Backup Settings Section
                 if (user != null) ...[
                   Card(
