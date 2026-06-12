@@ -89,6 +89,11 @@ class JournalRepositoryImpl implements JournalRepository {
   }
 
   @override
+  Future<List<TagData>> getAllTags() {
+    return _db.select(_db.tags).get();
+  }
+
+  @override
   Future<List<TagData>> getTagsForAsset(String assetId) {
     return (_db.select(_db.tags)..where((t) => t.visualAssetId.equals(assetId))).get();
   }
@@ -116,12 +121,20 @@ class JournalRepositoryImpl implements JournalRepository {
   @override
   Future<List<VisualAssetData>> searchAssetsByTag(String tagName) async {
     final query = _db.select(_db.visualAssets).join([
-      innerJoin(_db.tags, _db.tags.visualAssetId.equalsExp(_db.visualAssets.id)),
+      leftOuterJoin(_db.tags, _db.tags.visualAssetId.equalsExp(_db.visualAssets.id)),
     ])
-      ..where(_db.tags.name.equals(tagName) & _db.visualAssets.isDeleted.equals(false))
+      ..where(
+        (_db.visualAssets.autoTag.lower().equals(tagName) | _db.tags.name.equals(tagName))
+        & _db.visualAssets.isDeleted.equals(false)
+      )
       ..orderBy([OrderingTerm(expression: _db.visualAssets.createdAt, mode: OrderingMode.desc)]);
 
     final rows = await query.get();
-    return rows.map((row) => row.readTable(_db.visualAssets)).toList();
+    final Map<String, VisualAssetData> assetMap = {};
+    for (final row in rows) {
+      final asset = row.readTable(_db.visualAssets);
+      assetMap[asset.id] = asset;
+    }
+    return assetMap.values.toList();
   }
 }

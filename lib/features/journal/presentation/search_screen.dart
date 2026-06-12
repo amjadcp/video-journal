@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_journal/app/dependency_injection/providers.dart';
 import 'package:video_journal/core/storage/database.dart';
 import 'package:video_journal/features/journal/presentation/asset_detail_screen.dart';
+import 'package:video_journal/features/journal/presentation/journal_controller.dart';
 import 'package:video_journal/shared/enums/enums.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -50,6 +51,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final firstTags = ref.watch(firstTagsProvider).valueOrNull ?? {};
     return Scaffold(
       appBar: AppBar(
         title: TextField(
@@ -133,25 +135,26 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                               },
                             ),
                           ),
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                asset.autoTag,
-                                style: const TextStyle(
-                                  color: Colors.greenAccent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                           if (_getTagToDisplay(asset, firstTags).isNotEmpty)
+                             Positioned(
+                               top: 8,
+                               left: 8,
+                               child: Container(
+                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                 decoration: BoxDecoration(
+                                   color: Colors.black.withOpacity(0.6),
+                                   borderRadius: BorderRadius.circular(6),
+                                 ),
+                                 child: Text(
+                                   _getTagToDisplay(asset, firstTags),
+                                   style: const TextStyle(
+                                     color: Colors.greenAccent,
+                                     fontSize: 10,
+                                     fontWeight: FontWeight.bold,
+                                   ),
+                                 ),
                                 ),
                               ),
-                            ),
-                          ),
                           if (isVideo)
                             const Center(
                               child: CircleAvatar(
@@ -167,4 +170,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 ),
     );
   }
+}
+
+bool _isBooleanValue(String val) {
+  final lower = val.trim().toLowerCase();
+  return lower == 'true' || lower == 'false' || lower == '1' || lower == '0';
+}
+
+String _getTagToDisplay(VisualAssetData asset, Map<String, String> firstTags) {
+  if (asset.autoTag.isEmpty || _isBooleanValue(asset.autoTag)) {
+    return firstTags[asset.id] ?? '';
+  }
+  return asset.autoTag;
 }

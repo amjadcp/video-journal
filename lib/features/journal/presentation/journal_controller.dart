@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:crypto/crypto.dart';
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -143,8 +144,101 @@ class JournalController extends StateNotifier<AsyncValue<List<VisualAssetData>>>
     
     await loadAssets();
   }
+
+  Future<void> deleteAssets(List<String> assetIds) async {
+    final repo = _ref.read(journalRepositoryProvider);
+    final settingsRepo = _ref.read(settingsRepositoryProvider);
+    final authRepo = _ref.read(authRepositoryProvider);
+    
+    final deleteCloud = await settingsRepo.isDeleteCloudCopyEnabled();
+    final token = await authRepo.getAccessToken();
+    final api = token != null ? DriveService.getDriveApi(token) : null;
+
+    for (final id in assetIds) {
+      final asset = await repo.getAssetById(id);
+      await repo.deleteAsset(id);
+
+      if (asset != null) {
+        try {
+          final localFile = File(asset.localPath);
+          if (await localFile.exists()) {
+            await localFile.delete();
+          }
+          final thumbFile = File(asset.thumbnailPath);
+          if (await thumbFile.exists() && asset.thumbnailPath != asset.localPath) {
+            await thumbFile.delete();
+          }
+        } catch (_) {}
+
+        if (asset.driveFileId != null && deleteCloud && api != null) {
+          try {
+            await api.files.delete(asset.driveFileId!);
+          } catch (_) {}
+        }
+      }
+    }
+
+    await loadAssets();
+    _ref.read(foldersControllerProvider.notifier).loadFolders();
+  }
+
+  Future<void> moveAssetsToFolder(List<String> assetIds, String? folderId) async {
+    final repo = _ref.read(journalRepositoryProvider);
+
+    if (folderId == null) {
+      // Move to Home Journal
+      for (final id in assetIds) {
+        final asset = await repo.getAssetById(id);
+        if (asset != null) {
+          final autoTag = DateFormat('yy-MM-dd-HH-mm').format(DateTime.now());
+          final updated = asset.copyWith(
+            folderId: const Value(null),
+            autoTag: autoTag,
+            updatedAt: DateTime.now(),
+          );
+          await repo.updateAsset(updated);
+        }
+      }
+    } else {
+      // Move to specified folder
+      final folder = await repo.getFolderById(folderId);
+      if (folder == null) return;
+
+      var currentSequence = folder.sequenceCounter;
+
+      for (final id in assetIds) {
+        final asset = await repo.getAssetById(id);
+        if (asset != null) {
+          currentSequence++;
+          await repo.incrementFolderSequence(folderId);
+          final autoTag = '#$currentSequence';
+          final updated = asset.copyWith(
+            folderId: Value(folderId),
+            autoTag: autoTag,
+            updatedAt: DateTime.now(),
+          );
+          await repo.updateAsset(updated);
+        }
+      }
+    }
+
+    await loadAssets();
+    _ref.read(foldersControllerProvider.notifier).loadFolders();
+  }
 }
 
 final journalControllerProvider = StateNotifierProvider<JournalController, AsyncValue<List<VisualAssetData>>>((ref) {
   return JournalController(ref);
+});
+
+final firstTagsProvider = FutureProvider<Map<String, String>>((ref) async {
+  final repo = ref.watch(journalRepositoryProvider);
+  final tags = await repo.getAllTags();
+  final Map<String, String> firstTags = {};
+  for (final tag in tags) {
+    if (!firstTags.containsKey(tag.visualAssetId)) {
+      firstTags[tag.visualAssetId] = tag.name;
+    }
+  }
+  return firstTags;
 });

@@ -18,6 +18,7 @@ abstract class JournalRepository {
   Future<void> incrementFolderSequence(String folderId);
 
   // Tag Operations
+  Future<List<TagData>> getAllTags();
   Future<List<TagData>> getTagsForAsset(String assetId);
   Future<void> addTag(TagData tag);
   Future<void> deleteTag(String tagId);

@@ -197,6 +197,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       // Reload UI controllers with the newly restored local database data
       await ref.read(journalControllerProvider.notifier).loadAssets();
       await ref.read(foldersControllerProvider.notifier).loadFolders();
+      ref.invalidate(firstTagsProvider);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

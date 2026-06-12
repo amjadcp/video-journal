@@ -10,6 +10,14 @@ import 'package:video_journal/features/folders/presentation/folders_controller.d
 import 'package:video_journal/features/journal/presentation/journal_controller.dart';
 import 'package:video_journal/shared/enums/enums.dart';
 
+class TagItem {
+  final String? id; // null for auto-tag
+  final String name;
+  final bool isAuto;
+
+  TagItem({this.id, required this.name, required this.isAuto});
+}
+
 class AssetDetailScreen extends ConsumerStatefulWidget {
   final VisualAssetData asset;
 
@@ -24,14 +32,16 @@ class AssetDetailScreen extends ConsumerStatefulWidget {
 
 class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
   VideoPlayerController? _videoPlayerController;
+  late VisualAssetData _asset;
   List<TagData> _tags = [];
-  bool _isLoadingTags = true;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadTags();
-    if (widget.asset.assetType == AssetType.video) {
+    _asset = widget.asset;
+    _loadAssetAndTags();
+    if (_asset.assetType == AssetType.video) {
       _initVideo();
     }
   }
@@ -43,7 +53,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
   }
 
   Future<void> _initVideo() async {
-    final controller = VideoPlayerController.file(File(widget.asset.localPath));
+    final controller = VideoPlayerController.file(File(_asset.localPath));
     _videoPlayerController = controller;
     await controller.initialize();
     controller.setLooping(true);
@@ -51,13 +61,17 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
     setState(() {});
   }
 
-  Future<void> _loadTags() async {
-    setState(() => _isLoadingTags = true);
+  Future<void> _loadAssetAndTags() async {
+    setState(() => _isLoading = true);
     final repo = ref.read(journalRepositoryProvider);
-    final tags = await repo.getTagsForAsset(widget.asset.id);
+    final updatedAsset = await repo.getAssetById(widget.asset.id);
+    if (updatedAsset != null) {
+      _asset = updatedAsset;
+    }
+    final tags = await repo.getTagsForAsset(_asset.id);
     setState(() {
       _tags = tags;
-      _isLoadingTags = false;
+      _isLoading = false;
     });
   }
 
@@ -84,14 +98,15 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                 final repo = ref.read(journalRepositoryProvider);
                 final newTag = TagData(
                   id: const Uuid().v4(),
-                  visualAssetId: widget.asset.id,
+                  visualAssetId: _asset.id,
                   name: name.trim().toLowerCase(),
                   createdAt: DateTime.now(),
                   updatedAt: DateTime.now(),
                 );
                 await repo.addTag(newTag);
+                ref.invalidate(firstTagsProvider);
                 Navigator.pop(context);
-                _loadTags();
+                _loadAssetAndTags();
               }
             },
           ),
@@ -100,16 +115,15 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
     );
   }
 
-  Future<void> _editOrDeleteTag(TagData tag) async {
-    String name = tag.name;
+  Future<void> _editOrDeleteTag(TagItem tagItem) async {
+    final textController = TextEditingController(text: tagItem.name);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Edit Tag'),
         content: TextField(
           autofocus: true,
-          controller: TextEditingController(text: tag.name),
-          onChanged: (val) => name = val,
+          controller: textController,
           decoration: const InputDecoration(hintText: 'Tag label'),
         ),
         actions: [
@@ -117,29 +131,44 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
             onPressed: () async {
               final repo = ref.read(journalRepositoryProvider);
-              await repo.deleteTag(tag.id);
+              if (tagItem.isAuto) {
+                final updated = _asset.copyWith(autoTag: '', updatedAt: DateTime.now());
+                await repo.updateAsset(updated);
+                ref.read(journalControllerProvider.notifier).loadAssets();
+              } else {
+                await repo.deleteTag(tagItem.id!);
+              }
+              ref.invalidate(firstTagsProvider);
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Tag deleted.')),
                 );
               }
-              _loadTags();
+              _loadAssetAndTags();
             },
           ),
           TextButton(
             child: const Text('Save'),
             onPressed: () async {
-              if (name.trim().isNotEmpty) {
+              final newName = textController.text.trim().toLowerCase();
+              if (newName.isNotEmpty) {
                 final repo = ref.read(journalRepositoryProvider);
-                await repo.updateTag(tag.id, name.trim().toLowerCase());
+                if (tagItem.isAuto) {
+                  final updated = _asset.copyWith(autoTag: newName, updatedAt: DateTime.now());
+                  await repo.updateAsset(updated);
+                  ref.read(journalControllerProvider.notifier).loadAssets();
+                } else {
+                  await repo.updateTag(tagItem.id!, newName);
+                }
+                ref.invalidate(firstTagsProvider);
                 if (mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Tag updated.')),
                   );
                 }
-                _loadTags();
+                _loadAssetAndTags();
               }
             },
           ),
@@ -170,7 +199,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                 leading: const Icon(Icons.book, color: Colors.greenAccent),
                 title: const Text('Home Journal'),
                 onTap: () async {
-                  final updatedAsset = widget.asset.copyWith(folderId: const Value(null));
+                  final updatedAsset = _asset.copyWith(folderId: const Value(null));
                   await repo.updateAsset(updatedAsset);
                   ref.read(journalControllerProvider.notifier).loadAssets();
                   if (mounted) {
@@ -193,7 +222,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                       leading: const Icon(Icons.folder, color: Colors.orangeAccent),
                       title: Text(folder.name),
                       onTap: () async {
-                        final updatedAsset = widget.asset.copyWith(folderId: Value(folder.id));
+                        final updatedAsset = _asset.copyWith(folderId: Value(folder.id));
                         await repo.updateAsset(updatedAsset);
                         ref.read(journalControllerProvider.notifier).loadAssets();
                         if (mounted) {
@@ -230,7 +259,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
             onPressed: () async {
               Navigator.pop(context); // Close dialog
-              await ref.read(journalControllerProvider.notifier).deleteAsset(widget.asset.id);
+              await ref.read(journalControllerProvider.notifier).deleteAsset(_asset.id);
               if (mounted) {
                 Navigator.pop(context); // Return to home
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -246,7 +275,15 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isVideo = widget.asset.assetType == AssetType.video;
+    final isVideo = _asset.assetType == AssetType.video;
+
+    final List<TagItem> allTags = [];
+    if (_asset.autoTag.isNotEmpty) {
+      allTags.add(TagItem(name: _asset.autoTag, isAuto: true));
+    }
+    for (final t in _tags) {
+      allTags.add(TagItem(id: t.id, name: t.name, isAuto: false));
+    }
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -276,11 +313,11 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                           child: VideoPlayer(_videoPlayerController!),
                         )
                       : const CircularProgressIndicator())
-                  : Image.file(File(widget.asset.localPath)),
+                  : Image.file(File(_asset.localPath)),
             ),
           ),
 
-          // Metadata and Custom Tags Area
+          // Metadata and Tags Area
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -299,50 +336,19 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Auto Tag',
-                            style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              widget.asset.autoTag,
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const Text(
+                        'Status',
+                        style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const Text(
-                            'Status',
-                            style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.asset.syncStatus.name,
-                            style: TextStyle(
-                              color: widget.asset.syncStatus == SyncStatus.synced
-                                  ? Colors.green
-                                  : Colors.orangeAccent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        _asset.syncStatus.name,
+                        style: TextStyle(
+                          color: _asset.syncStatus == SyncStatus.synced
+                              ? Colors.green
+                              : Colors.orangeAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -351,19 +357,19 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'Custom Tags',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        'Tags',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
+                        icon: const Icon(Icons.add_circle_outline, size: 22),
                         onPressed: _addTag,
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _isLoadingTags
+                  _isLoading
                       ? const Center(child: LinearProgressIndicator())
-                      : _tags.isEmpty
+                      : allTags.isEmpty
                           ? const Padding(
                               padding: EdgeInsets.symmetric(vertical: 12),
                               child: Text(
@@ -374,13 +380,13 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
                           : Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: _tags.map((tag) {
+                              children: allTags.map((tagItem) {
                                 return GestureDetector(
-                                  onTap: () => _editOrDeleteTag(tag),
+                                  onTap: () => _editOrDeleteTag(tagItem),
                                   child: Chip(
-                                    label: Text(tag.name),
+                                    label: Text(tagItem.name),
                                     deleteIcon: const Icon(Icons.edit, size: 14),
-                                    onDeleted: () => _editOrDeleteTag(tag),
+                                    onDeleted: () => _editOrDeleteTag(tagItem),
                                   ),
                                 );
                               }).toList(),
